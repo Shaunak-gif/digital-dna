@@ -1,0 +1,72 @@
+version: '3.9'
+
+services:
+  # ─── PostgreSQL Database ───────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: digitaldna-postgres
+    environment:
+      POSTGRES_USER: digitaldna
+      POSTGRES_PASSWORD: digitaldna
+      POSTGRES_DB: digitaldna
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U digitaldna"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── FastAPI Backend ───────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: digitaldna-backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://digitaldna:digitaldna@postgres:5432/digitaldna
+      MODEL_PATH: /app/models
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ml/models:/app/models:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── React Frontend ────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: http://localhost:8000/api/behavioral
+    container_name: digitaldna-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # ─── Optional: Kafka for streaming ────────────────────
+  # Uncomment to enable real-time streaming pipeline
+  # zookeeper:
+  #   image: confluentinc/cp-zookeeper:7.6.0
+  #   environment:
+  #     ZOOKEEPER_CLIENT_PORT: 2181
+  #
+  # kafka:
+  #   image: confluentinc/cp-kafka:7.6.0
+  #   depends_on: [zookeeper]
+  #   ports:
+  #     - "9092:9092"
+  #   environment:
+  #     KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+  #     KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+volumes:
+  postgres_data:

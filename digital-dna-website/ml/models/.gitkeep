@@ -1,0 +1,10 @@
+# ML model files are generated here after running:
+# python ml/training/train.py --mode all
+#
+# Files created:
+#   isolation_forest.joblib  — Isolation Forest anomaly detector
+#   scaler.joblib            — Feature scaler
+#   lstm_behavior.pt         — LSTM sequence classifier (requires PyTorch)
+#   baseline_lr.joblib       — Logistic Regression baseline
+#   baseline_scaler.joblib   — Baseline scaler
+#   feature_names.json       — Feature order reference

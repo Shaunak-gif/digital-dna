@@ -1,0 +1,73 @@
+version: '3.9'
+
+# Production Docker Compose
+# Use this for VPS deployment (DigitalOcean, AWS EC2, etc.)
+# Run: docker-compose -f docker-compose.prod.yml up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: digitaldna-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-digitaldna}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme_in_production}
+      POSTGRES_DB: digitaldna
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U digitaldna"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: digitaldna-backend
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-digitaldna}:${DB_PASSWORD:-changeme_in_production}@postgres:5432/digitaldna
+      MODEL_PATH: /app/models
+    volumes:
+      - ./ml/models:/app/models:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: https://${DOMAIN:-localhost}/api/behavioral
+    container_name: digitaldna-frontend
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+
+  # Real-time pipeline (optional - requires Kafka)
+  realtime-pipeline:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: digitaldna-pipeline
+    restart: always
+    command: python services/realtime_pipeline.py
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-digitaldna}:${DB_PASSWORD:-changeme_in_production}@postgres:5432/digitaldna
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-localhost:9092}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - kafka  # Only starts with: docker-compose --profile kafka up
+
+volumes:
+  postgres_data:
