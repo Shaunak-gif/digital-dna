@@ -304,5 +304,3 @@ See **DEPLOYMENT.md** for full step-by-step guides.
 ```
 
 ---
-
-*"You can generate perfect text with AI in 3 seconds. But your fingers will always give you away."*
